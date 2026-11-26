@@ -23,9 +23,11 @@ The API uses GoFrame v2 and PostgreSQL 18. Compose applies the [migrations](migr
 
 To run without Docker, install Go 1.25.7 or later and run `go run ./apps/api`. Set `HTTP_ADDR` for the bind address, `DATABASE_URL` for PostgreSQL, and `HALFKM_AUTH_FILE` to configure business roles.
 
-## Milestone 2
+## Desktop and mobile web
 
-Neighborhood delivery supports building coverage, stock reservations, coupons, receipt recording, and merchant delivery. Group buying supports automatic cutoff by paid quantity, sorting, pickup verification, refund recording, and offline leader payouts. Buyer and store interfaces and live payment-provider integrations are planned for later releases.
+Open `http://127.0.0.1:8080/` and sign in with the token issued by the instance administrator. Operators and merchants manage directories, stock, delivery, campaigns, and settlement on desktop. Residents order and display pickup codes on mobile, and leaders view sorting lists, verify pickups, and review commissions. The [user guide](docs/index.md) covers role setup and trial runs. A trusted payments integration records verified payment receipts.
+
+Use Node.js 24 for the frontend. In `apps/web`, run `npm ci`, `npm run typecheck`, `npm run lint`, and `npm run build`. Run `npm run dev` to use the development proxy, or start Go with `HALFKM_WEB_DIR` pointing to the built `apps/web/dist` directory.
 
 Run `gofmt -l apps/api`, `go vet ./...`, and `go test ./...` before submitting changes. Point `HALFKM_TEST_DATABASE_URL` at a disposable PostgreSQL 18 database to run the HTTP transaction and concurrency tests. GitHub Actions starts a dedicated test database.
 

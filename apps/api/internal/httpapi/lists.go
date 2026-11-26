@@ -16,6 +16,11 @@ func pathID(name string) listScope {
 	return func(r request) (any, error) { return r.id(name) }
 }
 
+func leaderOptionsPoint(r request) (any, error) {
+	point, err := r.id("point")
+	return []int64{point, r.user.ID}, err
+}
+
 func ownedStore(r request) (any, error) { return r.storeID() }
 
 func list(api API, server *ghttp.Server, route string, roles []string, scope listScope, query string) {
@@ -61,7 +66,10 @@ func (api API) bindLists(server *ghttp.Server) {
 	list(api, server, "stores/:store/circles", storeAdmin, ownedStore, `SELECT c.id,c.name,s.active
 		FROM service_circles c JOIN store_service_circles s ON c.id=s.circle_id WHERE s.store_id=$1`)
 	list(api, server, "leaders", operator, nil, `SELECT id,display_name FROM leaders WHERE $1::bigint=0`)
-	list(api, server, "pickup-points/:point/leaders", storeAdmin, pathID("point"), `SELECT l.id,l.display_name,p.active FROM pickup_point_leaders p JOIN leaders l ON l.id=p.leader_id WHERE p.pickup_point_id=$1`)
+	list(api, server, "pickup-points/:point/leaders", storeAdmin, leaderOptionsPoint, `SELECT l.id,l.display_name,p.active FROM pickup_point_leaders p JOIN leaders l ON l.id=p.leader_id
+		WHERE p.pickup_point_id=($1::bigint[])[1] AND (($1::bigint[])[2]=0 OR EXISTS (
+			SELECT FROM pickup_points pp JOIN store_service_circles sc USING (circle_id)
+			WHERE pp.id=p.pickup_point_id AND sc.store_id=($1::bigint[])[2] AND sc.active))`)
 	list(api, server, "stores/:store/products", users, pathID("store"), `SELECT id,name FROM products WHERE store_id=$1`)
 	list(api, server, "stores/:store/skus", users, pathID("store"), `SELECT k.id,k.product_id,k.name,k.unit_price_cents,
 		COALESCE(s.on_hand-s.reserved,0) AS available FROM skus k LEFT JOIN stock s ON s.sku_id=k.id WHERE k.store_id=$1`)
@@ -71,8 +79,8 @@ func (api API) bindLists(server *ghttp.Server) {
 	list(api, server, "stores/:store/receiving-accounts", storeAdmin, ownedStore, `SELECT id,provider,merchant_number,active FROM receiving_accounts WHERE store_id=$1`)
 	list(api, server, "stores/:store/checkout-accounts", users, pathID("store"), `SELECT id,provider FROM receiving_accounts WHERE store_id=$1 AND active`)
 	list(api, server, "circles/:circle/campaigns", users, pathID("circle"), `SELECT c.id,c.store_id,c.pickup_point_id,c.cutoff_at,
-		(SELECT jsonb_agg(jsonb_build_object('sku_id',s.sku_id,'remaining',s.quota-s.paid_quantity) ORDER BY s.sku_id)
-			FROM group_campaign_skus s WHERE s.campaign_id=c.id) AS offers
+		COALESCE((SELECT jsonb_agg(jsonb_build_object('sku_id',s.sku_id,'remaining',s.quota-s.paid_quantity) ORDER BY s.sku_id)
+			FROM group_campaign_skus s WHERE s.campaign_id=c.id),'[]'::jsonb) AS offers
 		FROM group_campaigns c JOIN store_service_circles sc USING (store_id,circle_id)
 		WHERE c.circle_id=$1 AND sc.active AND c.cutoff_at>clock_timestamp()`)
 	list(api, server, "stores/:store/campaigns", merchantRole, ownedStore, `SELECT c.id,c.circle_id,c.pickup_point_id,c.leader_id,c.cutoff_at,

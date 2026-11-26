@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 
+	"github.com/shyun-cc/half-km/apps/api/internal/module/settlement"
 	"github.com/shyun-cc/half-km/apps/api/internal/workflow"
 )
 
@@ -252,6 +253,29 @@ func concurrent(count int, run func(int) reply) []reply {
 
 func TestPostgresImmediateHTTP(t *testing.T) {
 	f := newFixture(t)
+	if got := read[session](t, f.request("GET", "/session", "merchant", nil), 200); got.Role != "merchant" || got.ID != f.store {
+		t.Fatalf("merchant session: %+v", got)
+	}
+	read[any](t, f.request("GET", "/session", "payments", nil), 403)
+	read[any](t, f.request("GET", "/session", "", nil), 401)
+	circle := fmt.Sprintf("/circles/%d", f.circle)
+	link := f.shop(circle)
+	f.write("PUT", link, "operator", map[string]bool{"active": false})
+	if got := read[[]identifier](t, f.request("GET", circle+"/stores", "buyer", nil), 200); len(got) != 0 {
+		t.Fatalf("disabled store still listed: %+v", got)
+	}
+	f.write("PUT", link, "merchant", map[string]bool{"active": true})
+	if got := read[[]identifier](t, f.request("GET", circle+"/stores", "buyer", nil), 200); len(got) != 1 || got[0].ID != f.store {
+		t.Fatalf("enabled store missing: %+v", got)
+	}
+	leaders := fmt.Sprintf("/pickup-points/%d/leaders", f.point)
+	if got := read[[]identifier](t, f.request("GET", leaders, "merchant", nil), 200); len(got) != 1 || got[0].ID != f.leader {
+		t.Fatalf("authorized leader missing: %+v", got)
+	}
+	if got := read[[]identifier](t, f.request("GET", leaders, "other-merchant", nil), 200); len(got) != 0 {
+		t.Fatalf("another store's leader was exposed: %+v", got)
+	}
+
 	read[any](t, f.request("GET", "/communities", "", nil), 401)
 	read[any](t, f.request("POST", f.shop("/products"), "other-merchant", map[string]string{"name": "Wrong store"}), 403)
 	read[any](t, f.request("GET", f.shop("/skus"), "buyer", nil), 200)
@@ -407,6 +431,27 @@ func TestPostgresGroupHTTP(t *testing.T) {
 	read[any](t, f.request("POST", orderPath(a, "/pickup-code"), "other-buyer", nil), 404)
 	f.write("POST", f.campaign(c, "/arrival"), "merchant", nil)
 	read[any](t, f.request("POST", orderPath(a, "/redeem"), "other-leader", input), 404)
+	leaderBatch := fmt.Sprintf("/leader/batches/%d", c)
+	leaderAuth := fmt.Sprintf("/pickup-points/%d/leaders/%d", f.point, f.leader)
+	if got := read[[]identifier](t, f.request("GET", "/leader/batches", "leader", nil), 200); len(got) != 1 || got[0].ID != c {
+		t.Fatalf("leader batches: %+v", got)
+	}
+	if got := read[[]identifier](t, f.request("GET", "/leader/batches", "other-leader", nil), 200); len(got) != 0 {
+		t.Fatalf("another leader's batches were exposed: %+v", got)
+	}
+	read[any](t, f.request("GET", leaderBatch, "other-leader", nil), 404)
+	read[any](t, f.request("GET", leaderBatch, "buyer", nil), 403)
+	f.write("PUT", leaderAuth, "operator", map[string]bool{"active": false})
+	read[any](t, f.request("GET", leaderBatch, "leader", nil), 404)
+	f.write("PUT", leaderAuth, "operator", map[string]bool{"active": true})
+	available := read[struct {
+		Point int64      `json:"pickup_point_id"`
+		At    *time.Time `json:"arrived_at"`
+	}](t, f.request("GET", orderPath(a, ""), "buyer", nil), 200)
+	if available.Point != f.point || available.At == nil {
+		t.Fatalf("buyer pickup status: %+v", available)
+	}
+
 	for _, r := range concurrent(8, func(_ int) reply { return f.request("POST", orderPath(a, "/redeem"), "leader", input) }) {
 		read[any](t, r, 200)
 	}
@@ -414,6 +459,21 @@ func TestPostgresGroupHTTP(t *testing.T) {
 	read[any](t, f.request("POST", orderPath(a, "/redeem"), "leader", input), 409)
 	f.equal(1, "SELECT count(*) FROM commission_entries WHERE order_id=$1", a)
 	f.equal(200, "SELECT amount_cents FROM commission_entries WHERE order_id=$1", a)
+	gotBatch := read[struct {
+		Orders []struct {
+			At *time.Time `json:"redeemed_at"`
+		} `json:"order_statuses"`
+	}](t, f.request("GET", leaderBatch, "leader", nil), 200)
+	if len(gotBatch.Orders) != 2 || gotBatch.Orders[0].At == nil || gotBatch.Orders[1].At != nil {
+		t.Fatalf("leader batch order statuses: %+v", gotBatch)
+	}
+	if got := read[[]identifier](t, f.request("GET", "/leader/commission-entries", "leader", nil), 200); len(got) != 1 {
+		t.Fatalf("leader commission entries: %+v", got)
+	}
+	if got := read[[]identifier](t, f.request("GET", "/leader/commission-entries", "other-leader", nil), 200); len(got) != 0 {
+		t.Fatalf("another leader's commission was exposed: %+v", got)
+	}
+
 	f.equal(1, "SELECT count(*) FROM commission_entries e JOIN pickup_redemptions r USING (order_id) WHERE e.order_id=$1 AND e.eligible_at=r.redeemed_at+interval '168 hours'", a)
 
 	if err := workflow.Sweep(t.Context(), f.db); err != nil {
@@ -460,6 +520,13 @@ func (f *fixture) testSettlement(a, b int64) {
 	transfer := map[string]any{"offline_payment_reference": "offline-fixture", "amount_cents": 200, "offline_paid_at": now}
 	f.write("PUT", payout, "merchant", transfer)
 	f.write("PUT", payout, "merchant", transfer)
+	if got := read[[]settlement.Statement](t, f.request("GET", "/leader/commission-statements", "leader", nil), 200); len(got) != 1 || got[0].ID != statement || got[0].PaidAt == nil {
+		t.Fatalf("leader statements: %+v", got)
+	}
+	if got := read[[]identifier](t, f.request("GET", "/leader/commission-statements", "other-leader", nil), 200); len(got) != 0 {
+		t.Fatalf("another leader's statement was exposed: %+v", got)
+	}
+
 	transfer["offline_payment_reference"] = "another-transfer"
 	read[any](t, f.request("PUT", payout, "merchant", transfer), 409)
 	trade := "group-" + strconv.FormatInt(a, 10)

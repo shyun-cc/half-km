@@ -37,9 +37,19 @@ func Bind(server *ghttp.Server, db *sql.DB, auth Auth) {
 	api.bindOrders(server)
 	api.bindGroups(server)
 	api.bindLists(server)
+	api.bindLeader(server)
+	bind(api, server, "GET:/v1/session", []string{"operator", "merchant", "buyer", "leader"},
+		func(_ context.Context, _ *sql.Tx, r request, _ empty) (session, error) {
+			return session{Role: r.user.Role, ID: r.user.ID}, nil
+		})
 }
 
 type empty struct{}
+
+type session struct {
+	Role string `json:"role"`
+	ID   int64  `json:"id"`
+}
 
 type request struct {
 	user principal

@@ -138,8 +138,12 @@ func ReadBatch(ctx context.Context, tx *sql.Tx, id int64) (json.RawMessage, erro
 	var result json.RawMessage
 	err := tx.QueryRowContext(ctx, `SELECT to_jsonb(b) || jsonb_build_object(
 		'orders',COALESCE((SELECT jsonb_agg(order_id ORDER BY order_id) FROM group_batch_orders WHERE campaign_id=b.campaign_id),'[]'::jsonb),
-		'sorting_lines',COALESCE((SELECT jsonb_agg(jsonb_build_object('sku_id',sku_id,'quantity',quantity) ORDER BY sku_id)
-			FROM group_sorting_lines WHERE campaign_id=b.campaign_id),'[]'::jsonb))
+		'order_statuses',COALESCE((SELECT jsonb_agg(jsonb_build_object('order_id',bo.order_id,'canceled_at',o.canceled_at,
+			'redeemed_at',r.redeemed_at) ORDER BY bo.order_id)
+			FROM group_batch_orders bo JOIN orders o ON o.id=bo.order_id LEFT JOIN pickup_redemptions r ON r.order_id=bo.order_id
+			WHERE bo.campaign_id=b.campaign_id),'[]'::jsonb),
+		'sorting_lines',COALESCE((SELECT jsonb_agg(jsonb_build_object('sku_id',l.sku_id,'name',s.name,'quantity',l.quantity) ORDER BY l.sku_id)
+			FROM group_sorting_lines l JOIN skus s ON s.id=l.sku_id WHERE l.campaign_id=b.campaign_id),'[]'::jsonb))
 		FROM group_batches b WHERE campaign_id=$1`, id).Scan(&result)
 	return result, err
 }

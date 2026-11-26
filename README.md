@@ -23,9 +23,11 @@ API 使用 GoFrame v2 与 PostgreSQL 18。Compose 在全新数据卷中依序应
 
 不使用 Docker 时，安装 Go 1.25.7 或更高版本并运行 `go run ./apps/api`。使用 `HTTP_ADDR` 设置监听地址，使用 `DATABASE_URL` 连接 PostgreSQL，使用 `HALFKM_AUTH_FILE` 配置业务角色。
 
-## 里程碑 2
+## PC 与 H5
 
-即时配送支持楼栋覆盖、库存锁定、优惠券、收款入账和商户送达。团购支持按已付数量自动截团、分拣、自提核销、退款登记和团长佣金线下结算。买家与商户界面及真实支付渠道集成安排在后续版本。
+打开 `http://127.0.0.1:8080/`，使用管理员发放的令牌进入对应工作区。运营和商户在 PC 管理档案、库存、配送、团购和结算。居民在 H5 下单和出示提货码，团长在 H5 查看分拣单、核销和核对佣金。业务角色配置与试用步骤见[用户使用手册](docs/index.md)。真实支付回执由可信收款调用方登记。
+
+前端使用 Node.js 24。在 `apps/web` 运行 `npm ci`、`npm run typecheck`、`npm run lint` 和 `npm run build`。本地可运行 `npm run dev` 通过开发代理连接 API，也可在启动 Go 时将 `HALFKM_WEB_DIR` 指向构建产物 `apps/web/dist`。
 
 提交前运行 `gofmt -l apps/api`、`go vet ./...` 和 `go test ./...`。将 `HALFKM_TEST_DATABASE_URL` 指向隔离的 PostgreSQL 18 数据库可运行 HTTP 事务与并发测试。GitHub Actions 会启动专用测试数据库。
 

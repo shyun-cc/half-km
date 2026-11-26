@@ -29,8 +29,8 @@ func SaveStore(ctx context.Context, tx *sql.Tx, id int64, input Store) (int64, e
 }
 
 func SetCircle(ctx context.Context, tx *sql.Tx, store, circle int64, active bool) error {
-	_, err := tx.ExecContext(ctx, `INSERT INTO store_service_circles (store_id,circle_id) VALUES ($1,$2)
-		ON CONFLICT DO NOTHING`, store, circle)
+	_, err := tx.ExecContext(ctx, `INSERT INTO store_service_circles (store_id,circle_id,active) VALUES ($1,$2,$3)
+		ON CONFLICT (store_id,circle_id) DO UPDATE SET active=EXCLUDED.active`, store, circle, active)
 	return err
 }
 

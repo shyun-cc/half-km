@@ -57,5 +57,10 @@ func main() {
 			response.Success(r, map[string]string{"status": "ready"})
 		})
 	}
+	if root := os.Getenv("HALFKM_WEB_DIR"); root != "" {
+		if err := bindWeb(server, root); err != nil {
+			log.Fatal(err)
+		}
+	}
 	server.Run()
 }
