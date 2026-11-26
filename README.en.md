@@ -19,15 +19,15 @@ curl -fsS http://127.0.0.1:8080/ready
 docker compose down
 ```
 
-The API uses GoFrame v2 and PostgreSQL 18. Compose initializes the schema in a fresh database volume, publishes the API on loopback, and keeps the development database on the Compose network. `down` preserves the data volume. For a separate empty database, apply the [initial migration](migrations/0001_initial.sql) once using `psql -v ON_ERROR_STOP=1 -f migrations/0001_initial.sql` with your normal connection settings.
+The API uses GoFrame v2 and PostgreSQL 18. Compose applies the [migrations](migrations/) in order on a fresh volume, publishes the API on loopback, and keeps the development database on the Compose network. `down` preserves the volume. See the [deployment guide](docs/deployment.md) for existing instances and standalone databases.
 
-To run the API without Docker, install Go 1.25.7 or later and run `go run ./apps/api`. It listens on port 8080 by default. Set `HTTP_ADDR` to override the bind address and `DATABASE_URL` to enable the database readiness endpoint.
+To run without Docker, install Go 1.25.7 or later and run `go run ./apps/api`. Set `HTTP_ADDR` for the bind address, `DATABASE_URL` for PostgreSQL, and `HALFKM_AUTH_FILE` to configure business roles.
 
-## Milestone 1
+## Milestone 2
 
-The repository ships a runnable health API, a PostgreSQL schema and domain tests for payment replay, group cutoff and pickup redemption. Buyer and store interfaces, workflow persistence and real payment-provider integration are future milestones.
+Neighborhood delivery supports building coverage, stock reservations, coupons, receipt recording, and merchant delivery. Group buying supports automatic cutoff by paid quantity, sorting, pickup verification, refund recording, and offline leader payouts. Buyer and store interfaces and live payment-provider integrations are planned for later releases.
 
-Run `gofmt -l apps/api`, `go vet ./...` and `go test ./...` before submitting changes.
+Run `gofmt -l apps/api`, `go vet ./...`, and `go test ./...` before submitting changes. Point `HALFKM_TEST_DATABASE_URL` at a disposable PostgreSQL 18 database to run the HTTP transaction and concurrency tests. GitHub Actions starts a dedicated test database.
 
 [User guide (Simplified Chinese)](docs/index.md)
 

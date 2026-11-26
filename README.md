@@ -19,15 +19,15 @@ curl -fsS http://127.0.0.1:8080/ready
 docker compose down
 ```
 
-API 使用 GoFrame v2 与 PostgreSQL 18。Compose 在全新数据卷初始化数据库结构，API 仅绑定本机回环地址，开发数据库仅在 Compose 网络内可用。`down` 会保留数据卷。如使用独立的空库，通过常规连接配置执行一次 `psql -v ON_ERROR_STOP=1 -f migrations/0001_initial.sql` 应用[初始迁移](migrations/0001_initial.sql)。
+API 使用 GoFrame v2 与 PostgreSQL 18。Compose 在全新数据卷中依序应用 [migrations](migrations/)，API 绑定本机回环地址，开发数据库仅在 Compose 网络内可用。`down` 保留数据卷。现有实例和独立数据库的迁移步骤见[部署指南](docs/deployment.md)。
 
-不使用 Docker 时，安装 Go 1.25.7 或更高版本，运行 `go run ./apps/api`，默认监听 8080。可通过 `HTTP_ADDR` 修改监听地址，通过 `DATABASE_URL` 启用数据库就绪检查。
+不使用 Docker 时，安装 Go 1.25.7 或更高版本并运行 `go run ./apps/api`。使用 `HTTP_ADDR` 设置监听地址，使用 `DATABASE_URL` 连接 PostgreSQL，使用 `HALFKM_AUTH_FILE` 配置业务角色。
 
-## 里程碑 1
+## 里程碑 2
 
-当前交付可运行的健康检查 API、PostgreSQL 数据结构和支付重放、截团、提货核销的领域测试。买家与商户界面、业务流程持久化和真实支付渠道接入安排在后续里程碑。
+即时配送支持楼栋覆盖、库存锁定、优惠券、收款入账和商户送达。团购支持按已付数量自动截团、分拣、自提核销、退款登记和团长佣金线下结算。买家与商户界面及真实支付渠道集成安排在后续版本。
 
-提交前运行 `gofmt -l apps/api`、`go vet ./...` 和 `go test ./...`。
+提交前运行 `gofmt -l apps/api`、`go vet ./...` 和 `go test ./...`。将 `HALFKM_TEST_DATABASE_URL` 指向隔离的 PostgreSQL 18 数据库可运行 HTTP 事务与并发测试。GitHub Actions 会启动专用测试数据库。
 
 [用户使用手册](docs/index.md)
 

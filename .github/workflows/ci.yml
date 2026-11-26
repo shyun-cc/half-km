@@ -12,6 +12,20 @@ jobs:
   go:
     name: Go checks
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: halfkm
+          POSTGRES_DB: halfkm_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U halfkm -d halfkm_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -25,4 +39,7 @@ jobs:
             exit 1
           fi
       - run: go vet ./...
-      - run: go test ./...
+      - name: Run Go and PostgreSQL transaction tests
+        env:
+          HALFKM_TEST_DATABASE_URL: postgres://halfkm@127.0.0.1:${{ job.services.postgres.ports[5432] }}/halfkm_test?sslmode=disable
+        run: go test -race ./...

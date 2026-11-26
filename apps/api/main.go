@@ -8,6 +8,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/shyun-cc/half-km/apps/api/internal/httpapi"
+	"github.com/shyun-cc/half-km/apps/api/internal/workflow"
+
 	"github.com/gogf/gf/v2/net/ghttp"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/shyun-cc/shw-gf-lib/response"
@@ -33,12 +36,22 @@ func main() {
 		defer db.Close()
 		db.SetMaxOpenConns(5)
 		db.SetMaxIdleConns(2)
+		auth, err := httpapi.LoadAuth(os.Getenv("HALFKM_AUTH_FILE"))
+		if err != nil {
+			log.Fatal("could not load HALFKM_AUTH_FILE: ", err)
+		}
+		httpapi.Bind(server, db, auth)
+		workerContext, stopWorker := context.WithCancel(context.Background())
+		defer stopWorker()
+		go workflow.RunWorker(workerContext, db)
 		server.BindHandler("GET:/ready", func(r *ghttp.Request) {
 			ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 			defer cancel()
-			if err := db.PingContext(ctx); err != nil {
+			var migrated bool
+			err := db.QueryRowContext(ctx, "SELECT to_regclass('coupon_uses') IS NOT NULL").Scan(&migrated)
+			if err != nil || !migrated {
 				r.Response.WriteHeader(http.StatusServiceUnavailable)
-				response.Error(r, "database unavailable", http.StatusServiceUnavailable)
+				response.Error(r, "database or schema unavailable", http.StatusServiceUnavailable)
 				return
 			}
 			response.Success(r, map[string]string{"status": "ready"})
