@@ -1,0 +1,6 @@
+title: 半公里
+description: 半公里用户使用手册
+lang: zh-CN
+theme: jekyll-theme-cayman
+plugins:
+  - jekyll-relative-links
