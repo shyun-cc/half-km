@@ -16,7 +16,6 @@ From the repository root, run Docker Compose v2.
 docker compose up --build -d
 curl --retry 5 --retry-connrefused -fsS http://127.0.0.1:8080/health
 curl -fsS http://127.0.0.1:8080/ready
-docker compose down
 ```
 
 The API uses GoFrame v2 and PostgreSQL 18. Compose applies the [migrations](migrations/) in order on a fresh volume, publishes the API on loopback, and keeps the development database on the Compose network. `down` preserves the volume. See the [deployment guide](docs/deployment.md) for existing instances and standalone databases.
@@ -25,7 +24,7 @@ To run without Docker, install Go 1.25.7 or later and run `go run ./apps/api`. S
 
 ## Desktop and mobile web
 
-Open `http://127.0.0.1:8080/` and sign in with the token issued by the instance administrator. Operators and merchants manage directories, stock, delivery, campaigns, and settlement on desktop. Residents order and display pickup codes on mobile, and leaders view sorting lists, verify pickups, and review commissions. The [user guide](docs/index.md) covers role setup and trial runs. A trusted payments integration records verified payment receipts.
+Open `http://127.0.0.1:8080/` and sign in with the token issued by the instance administrator. Operators and merchants manage directories, stock, delivery, campaigns, and settlement on desktop. Residents order and display pickup codes on mobile, and leaders view sorting lists, verify pickups, and review commissions. The [user guide](docs/index.md) covers role setup and trial runs. Run `docker compose down` when you finish trying the application. A trusted payments integration records verified payment receipts.
 
 Use Node.js 24 for the frontend. In `apps/web`, run `npm ci`, `npm run typecheck`, `npm run lint`, and `npm run build`. Run `npm run dev` to use the development proxy, or start Go with `HALFKM_WEB_DIR` pointing to the built `apps/web/dist` directory.
 

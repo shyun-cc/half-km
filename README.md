@@ -16,7 +16,6 @@
 docker compose up --build -d
 curl --retry 5 --retry-connrefused -fsS http://127.0.0.1:8080/health
 curl -fsS http://127.0.0.1:8080/ready
-docker compose down
 ```
 
 API 使用 GoFrame v2 与 PostgreSQL 18。Compose 在全新数据卷中依序应用 [migrations](migrations/)，API 绑定本机回环地址，开发数据库仅在 Compose 网络内可用。`down` 保留数据卷。现有实例和独立数据库的迁移步骤见[部署指南](docs/deployment.md)。
@@ -25,7 +24,7 @@ API 使用 GoFrame v2 与 PostgreSQL 18。Compose 在全新数据卷中依序应
 
 ## PC 与 H5
 
-打开 `http://127.0.0.1:8080/`，使用管理员发放的令牌进入对应工作区。运营和商户在 PC 管理档案、库存、配送、团购和结算。居民在 H5 下单和出示提货码，团长在 H5 查看分拣单、核销和核对佣金。业务角色配置与试用步骤见[用户使用手册](docs/index.md)。真实支付回执由可信收款调用方登记。
+打开 `http://127.0.0.1:8080/`，使用管理员发放的令牌进入对应工作区。运营和商户在 PC 管理档案、库存、配送、团购和结算。居民在 H5 下单和出示提货码，团长在 H5 查看分拣单、核销和核对佣金。业务角色配置与试用步骤见[用户使用手册](docs/index.md)。试用结束后可运行 `docker compose down`。真实支付回执由可信收款调用方登记。
 
 前端使用 Node.js 24。在 `apps/web` 运行 `npm ci`、`npm run typecheck`、`npm run lint` 和 `npm run build`。本地可运行 `npm run dev` 通过开发代理连接 API，也可在启动 Go 时将 `HALFKM_WEB_DIR` 指向构建产物 `apps/web/dist`。
 

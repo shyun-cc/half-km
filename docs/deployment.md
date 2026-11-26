@@ -69,7 +69,7 @@ services:
         read_only: true
 ```
 
-例如保存为仓库外的 `/absolute/path/to/half-km.override.yml`，在仓库根目录运行：
+将示例保存为仓库外的 `/absolute/path/to/half-km.override.yml`，然后在仓库根目录启动服务。
 
 ```sh
 docker compose -f docker-compose.yml -f /absolute/path/to/half-km.override.yml up --build -d
